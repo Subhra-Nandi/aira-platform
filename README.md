@@ -1,84 +1,284 @@
-🚀 AIRA
+ Multi-Agent AI Research Platform (AIRA)
 
-Autonomous Intelligence Research \& Automation Platform
-
-AIRA is a sophisticated multi-agent orchestration framework designed to bridge the gap between simple LLM prompting and structured, human-like problem-solving. By decomposing complex goals into a coordinated pipeline, AIRA moves beyond static chat toward truly autonomous research, reasoning, and action.
+> An intelligent backend system that orchestrates three specialized AI agents — Research, Analysis, and Coding — to help founders explore startup ideas, analyze markets, and generate production-ready code from a single natural language prompt.
 
 
 
-🧠 System Architecture
+## What it does
 
-Unlike monolithic AI applications, AIRA uses a Modular Agent Stack managed by a central dynamic orchestrator.
+You send one goal. The system figures out what kind of work needs to happen, routes it across the right agents, searches the live web, reasons about the results, and returns structured startup ideas, market insights, or working code — all personalized to your founder profile.
 
-The Specialized Agent Workforce
+**Example:**
+```
+POST /api/v1/tasks
+{
+  "goal": "Find AI startup opportunities in edtech for 2025",
+  "industry": "edtech",
+  "location": "India",
+  "budget": "bootstrap",
+  "technical_level": "intermediate"
+}
+```
 
-&#x20;\* 🔍 Research Agent: Conducts deep-dive knowledge gathering using the Tavily API and contextual memory.
+Returns 3 personalized startup ideas with problem/solution/market size/competitors/business model, a risk assessment for each, and a concrete first step tailored to your profile.
 
-&#x20;\* 📊 Analysis Agent: Synthesizes raw data to extract patterns, strategic insights, and logical conclusions.
+---
 
-&#x20;\* 💻 Coding Agent: Translates structured blueprints into executable code, project scaffolding, or technical documentation.
+## Architecture
 
-The Intelligence Layer
+```
+Client / n8n / curl
+        │
+        ▼
+  POST /api/v1/tasks
+        │
+  ┌─────▼──────────────┐
+  │   FastAPI router    │  ← Pydantic validation, task_id generation
+  │   task_router.py    │  ← tasks_db (in-memory store)
+  └─────┬──────────────┘
+        │
+  ┌─────▼──────────────┐
+  │    Orchestrator     │  ← Planner decides which agents run
+  │ agent_orchestrator  │
+  └──┬──────┬──────┬───┘
+     │      │      │
+     ▼      ▼      ▼
+Research  Analysis  Coding
+ Agent    Agent     Agent
+  (always) (if analyze/  (if code/
+           compare/      build/app
+           strategy)     detected)
+     │
+     ├── Intent detection (past / present / future)
+     ├── 2× Tavily web search
+     ├── Smart token-budget truncation
+     ├── VectorStore memory (read + write)
+     └── LLM call → structured startup ideas
+```
 
-&#x20;\* Dynamic Orchestration: A rule-based planner that analyzes user intent to determine the optimal execution path.
+---
 
-&#x20;\* Vector-Based Memory: Uses HuggingFace Embeddings + ChromaDB to retain and retrieve past insights, improving context over time.
+## Features
 
-⚙️ Key Features
+Research agent
+- **Intent detection** — classifies the goal as past, present, or future-oriented and adjusts search queries accordingly
+- **Dual web search** — runs two targeted Tavily queries per task, scored by relevance
+- **Smart truncation** — scores results and trims to a token budget before building the prompt
+- **Token guard** — estimates prompt size before the LLM call; returns a structured error instead of an over-budget API call
+- **Vector memory** — persists results to a vector store and injects relevant prior context into new prompts
+- **Founder profile personalization** — injects industry, location, budget, team size, and risk appetite into the LLM prompt for tailored output
 
-&#x20;\* 🔄 Flexible Workflows: Supports single-agent, dual-agent, or full end-to-end pipeline execution.
+### Analysis agent
+- Accepts research output and extracts patterns, insights, and conclusions
+- Keyword-triggered (fires when "analyze", "compare", "strategy", "evaluate" etc. are detected in the goal)
 
-&#x20;\* 🌐 Real-Time Synthesis: Fetches current market trends, competitors, and insights from the live web.
+### Coding agent
+- Generates full project scaffolds with clearly delimited filenames
+- Produces `requirements.txt`, `app.py`, and supporting files ready to run
+- Keyword-triggered (fires when "code", "build", "implement", "app", "api" etc. are detected)
 
-&#x20;\* 📊 Strategy Generation: Transforms unstructured data into structured decision-making frameworks.
+### API layer (FastAPI)
+- `POST /api/v1/tasks` — submit a goal with optional founder profile fields
+- `GET /api/v1/tasks` — list all tasks and their statuses
+- `GET /api/v1/tasks/{task_id}` — retrieve a single task result
+- Pydantic request validation with sensible defaults for all profile fields
+- In-memory task store with status tracking (`running` → `completed` / `failed`)
+- Structured error responses with HTTP status codes (400 for token limit, 500 for agent failures)
 
-&#x20;\* 💻 Automated Scaffolding: Generates multi-file project structures with clear architectural separation.
+---
 
-&#x20;\* 🔌 REST API Ready: Built with FastAPI for clean, versioned integration with frontend systems.
+## Tech stack
 
+| Layer                |    Technology                                      |
+|----------------------|----------------------------------------------------|
+| API framework        | FastAPI                                            |
+| Request validation   | Pydantic v2                                        |
+| Web search           | Tavily API                                         |
+| LLM                  | GPT-4o (via Azure AI Inference using GitHub Token) |
+| Memory               | ChromaDB + sentence-transformers                   |                 
+| Task orchestration   | Custom planner + agent runner                      |
+| Workflow automation  | n8n (HTTP Request node integration)                |
 
+---
 
-🚧 Current Status \& Roadmap
+## Getting started
 
-AIRA is currently in its MVP phase. Below is the transition plan from rule-based automation to full agentic autonomy.
+### Prerequisites
+- Python 3.11+
+- A Tavily API key ([get one here](https://tavily.com))
+- A personalized github token
 
-Current Limitations (v1.0)
+### Installation
 
-&#x20;\* Keyword-Based Planning: Agent selection relies on rule-based matching rather than LLM reasoning.
+```bash
+git clone https://github.com/Subhra-Nandi/aira-platform.git
+cd aira-platform
 
-&#x20;\* Synchronous Execution: Tasks run sequentially, which may impact performance for large-scale research.
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
 
-&#x20;\* Ephemeral Storage: Tasks are stored in-memory; data does not persist across server restarts.
+pip install -r requirements.txt
+```
 
-The Future Scope (v2.0)
+### Environment variables
 
-&#x20;\* 🧠 AI-Powered Planner: Replacing rules with an LLM-driven graph for dynamic task decomposition.
+Create a `.env` file in the project root:
 
-&#x20;\* 🔗 Graph-Based Execution: Implementing LangGraph for parallel and iterative agent workflows.
+```env
+TAVILY_API_KEY=your_tavily_key_here
+GITHUB_TOKEN=your_github_token_here   
+```
 
-&#x20;\* 🗄️ Persistence Layer: Integrating PostgreSQL for long-term task history and user sessions.
+### Run the server
 
-&#x20;\* ⚡ Async Processing: Moving to background workers (Celery) for scalable, non-blocking execution.
+```bash
+uvicorn app.main:app --reload --port
+```
 
+The API will be live at `http://localhost:8000`. Interactive docs at `http://localhost:8000/docs`.
 
+---
 
-🛠️ Tech Stack
+## API usage
 
-| Category | Tools |
+### Submit a task
+### using cURL (Linux / macOS)
 
-|---|---|
+```bash
+curl -X POST http://localhost:8000/api/v1/tasks \
+  -H "Content-Type: application/json" \
+  -d '{
+    "goal": "Find AI startup ideas in healthcare for India",
+    "industry": "healthcare",
+    "location": "India",
+    "budget": "bootstrap",
+    "risk_appetite": "medium",
+    "technical_level": "intermediate",
+    "team_size": "solo"
+  }'
+```
 
-| Language | Python 3.10+ |
+**Response:**
+```json
+{
+  "task_id": "3f2a1b4c-...",
+  "status": "completed",
+  "result": {
+    "version": "v1",
+    "status": "success",
+    "goal": "...",
+    "plan": { "research": true, "analysis": false, "coding": false },
+    "results": [
+      {
+        "agent": "research",
+        "type": "text",
+        "content": "## Insights\n...\n## Idea 1: ..."
+      }
+    ]
+  }
+}
+```
 
-| Framework | FastAPI |
+### Check task status
 
-| Vector DB | ChromaDB |
+```bash
+curl http://localhost:8000/api/v1/tasks/{task_id}
+```
 
-| Embeddings | HuggingFace (Open Source) |
+### n8n integration
 
-| Tools | Tavily Search API |
+Add an **HTTP Request** node in your n8n workflow:
+- Method: `POST`
+- URL: `http://localhost:8000/api/v1/tasks`
+- Body: JSON with `goal` and any profile fields
 
-| Architecture | Multi-Agent System (MAS) |
+Add a **Code** node after it to validate:
+```javascript
+const body = $input.first().json;
+if (!body.results || !Array.isArray(body.results)) {
+  throw new Error("Unexpected response: " + JSON.stringify(body));
+}
+return body.results.map(r => ({ json: r }));
+```
 
+Verify the server health before running:
+```bash
+curl http://localhost:8000/docs         # FastAPI auto-docs
+curl http://localhost:5678/healthz      # n8n health endpoint
+n8n --version                           # verify n8n install
+```
 
+---
 
+## Project structure
+
+```
+aira-platform/
+├── app/
+│   ├── main.py                    # FastAPI app entry point
+│   ├── routers/
+│   │   └── task_routes.py         # POST/GET /api/v1/tasks
+│   ├── agents/
+│   │   ├── research_agent.py      # Intent detection, web search, LLM
+│   │   ├── analysis_agent.py      # Pattern extraction
+│   │   └── coding_agent.py        # Code generation
+│   ├── services/
+│   │   ├── agent_orchestrator.py  # Planner + agent runner
+│   │   ├── llm_service.py         # LLM API wrapper
+│   │   └── intent_detector.py     # Past / present / future classifier
+│   ├── tools/
+│   │   └── web_search.py          # Tavily client wrapper
+│   └── memory/
+│       └── vector_store.py        # In-memory vector store
+├── .env.example
+├── requirements.txt
+└── README.md
+```
+
+---
+
+## Roadmap
+
+### High priority
+- [ ] **Structured error propagation** — agent-level errors should bubble up cleanly rather than silently producing empty strings in downstream agents
+- [ ] **LLM-based planner** — replace keyword substring matching with a fast classifier call for more reliable routing
+- [ ] **Typed agent handoffs** — pass structured dicts between agents instead of sliced raw strings to prevent silent data loss
+
+### Medium priority
+- [ ] **Async agent execution** — run independent agents concurrently with `asyncio.gather()` to reduce total latency
+- [ ] **Accurate token counting** — replace the `len // 4` heuristic with `tiktoken` for the exact model being called
+- [ ] **Profile injection in all agents** — analysis and coding agents accept `user_profile` but currently ignore it; wire it into their prompts
+- [ ] **Per-session VectorStore** — replace the global singleton with scoped instances to prevent cross-request memory contamination
+
+### Low priority
+- [ ] **Streaming LLM responses** — stream tokens back to the client for a faster perceived response
+- [ ] **API key authentication** — add `X-API-Key` header validation and rate limiting
+- [ ] **Prompt injection sanitization** — sanitize user-supplied `goal` strings before interpolating into prompts
+- [ ] **React frontend dashboard** — visual interface to set founder profile, submit goals, and browse agent outputs
+- [ ] **Docker + docker-compose** — containerize the app for one-command deployment
+
+---
+
+## Limitations (current)
+
+- `tasks_db` is in-memory only — tasks are lost on server restart. A future version will add Redis or SQLite persistence.
+- The planner always runs the Research agent regardless of goal type. Tasks like "build a login API" still trigger a web search unnecessarily.
+- Agents run synchronously and sequentially, so a full research + analysis + coding run can take 20–40 seconds depending on LLM latency.
+- No authentication on the API endpoints.
+
+---
+
+## Contributing
+
+Pull requests are welcome. For major changes, please open an issue first to discuss what you'd like to change.
+
+1. Fork the repo
+2. Create a feature branch (`git checkout -b feature/async-agents`)
+3. Commit your changes (`git commit -m 'Add async agent execution'`)
+4. Push and open a pull request
+
+---
+
+## License
+
+MIT
